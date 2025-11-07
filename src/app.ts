@@ -17,40 +17,27 @@ const limiter = rateLimit({
 });
 
 // Very permissive CORS: allow every origin and echo/request all headers.
-// WARNING: This is insecure for production. Use only for local/dev or when
-// you explicitly want to allow everything.
-app.use((req: express.Request, res: Response, next: NextFunction) => {
-  // Allow any origin
+// WARNING: This is insecure for production.
+app.use((req: express.Request, res: Response, next: NextFunction): void => {
   res.header('Access-Control-Allow-Origin', '*');
-
-  // Allow common methods and OPTIONS (preflight)
   res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
-
-  // If the browser sent Access-Control-Request-Headers (preflight), echo them back.
-  // Otherwise allow any header by using '*'. Some servers/clients expect an explicit list,
-  // so echoing what's requested is the most permissive reliable approach.
   const requestedHeaders = req.header('access-control-request-headers');
   res.header('Access-Control-Allow-Headers', requestedHeaders || '*');
-
-  // Allow credentials is incompatible with Access-Control-Allow-Origin: '*' in browsers.
-  // We're not enabling credentials here to remain fully permissive. If you need credentials,
-  // change the logic to reflect a single origin instead of '*'.
   res.header('Access-Control-Allow-Credentials', 'false');
 
-  // Short-circuit preflight requests
   if (req.method === 'OPTIONS') {
-    return res.sendStatus(200);
+    res.sendStatus(200);
+    return; // Ensure consistent void return.
   }
 
   next();
 });
 
-// Keep cors middleware as a fallback for non-OPTIONS requests (no-op in our setup,
-// but harmless to keep for future use)
+// Optional: keep for future (currently redundant)
 app.use(cors());
 
 app.use(cache('5 minutes'));
-app.use(limiter); //limit to all API
+app.use(limiter);
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   console.log('Requested URL:', req.originalUrl);
   next();
@@ -59,7 +46,7 @@ app.use((req: express.Request, _res: Response, next: NextFunction) => {
 app.get('/', (_req, res) => {
   res.json({
     apiOverview:
-      'Welcome to the Alfa-Leetcode-API! Alfa-Leetcode-Api is a custom solution born out of the need for a well-documented and detailed LeetCode API. This project is designed to provide developers wit[...]
+      'Welcome to the Alfa-Leetcode-API! Alfa-Leetcode-Api is a custom solution born out of the need for a well-documented and detailed LeetCode API. This project aims to provide developers with accessible endpoints for user data, problems, discussions, contests and more.',
     apiEndpointsLink:
       'https://github.com/alfaarghya/alfa-leetcode-api?tab=readme-ov-file#endpoints-',
     routes: {
@@ -82,7 +69,6 @@ app.get('/', (_req, res) => {
         '/:username/skill': 'Get your skill stats',
         '/:username/language': 'Get your language stats',
         '/:username/progress': 'Get your progress stats',
-        
       },
       discussion: {
         description: 'Endpoints for fetching discussion topics and comments.',
@@ -110,58 +96,50 @@ app.get('/', (_req, res) => {
           '/problems?skip=500': 'Get list after skipping a given amount of problems',
           '/problems?difficulty=EASY': 'Get list of problems having selected difficulty',
           '/problems?limit=5&skip=100': 'Get list of size limit after skipping selected amount',
-          'problems?tags=array+maths&limit=5&skip=100': 'Get list of problems with selected tags having size limit after skipping selected amount',
+          'problems?tags=array+maths&limit=5&skip=100':
+            'Get list of problems with selected tags having size limit after skipping selected amount',
           '/officialSolution?titleSlug=two-sum':
             'Get official solution of selected problem',
-
         },
       },
     },
   });
 });
 
-
-//get trending Discuss
+// Discuss routes
 app.get('/trendingDiscuss', leetcode.trendingCategoryTopics);
-
-//get discuss topic
 app.get('/discussTopic/:topicId', leetcode.discussTopic);
-
-//get discuss comments
 app.get('/discussComments/:topicId', leetcode.discussComments);
 
-//get the daily leetCode problem
+// Daily problems
 app.get('/daily', leetcode.dailyProblem);
 app.get('/daily/raw', leetcode.dailyProblemRaw);
 
-//get the selected question
+// Selected problem
 app.get('/select', leetcode.selectProblem);
 app.get('/select/raw', leetcode.selectProblemRaw);
 
-//get official solution
+// Official solution
 app.get('/officialSolution', leetcode.officialSolution);
 
-//get list of problems
+// Problem lists
 app.get('/problems', leetcode.problems);
 
-//get contests
+// Contests
 app.get('/contests', leetcode.allContests);
 app.get('/contests/upcoming', leetcode.upcomingContests);
 
-// Construct options object on all user routes.
-app.use(
-  '/:username*',
-  (req: FetchUserDataRequest, _res: Response, next: NextFunction) => {
-    req.body = {
-      username: req.params.username,
-      limit: req.query.limit,
-      year: req.query.year === undefined ? 0 : req.query.year,
-    };
-    next();
-  }
-);
+// User route preprocessing
+app.use('/:username*', (req: FetchUserDataRequest, _res: Response, next: NextFunction) => {
+  req.body = {
+    username: req.params.username,
+    limit: req.query.limit,
+    year: req.query.year === undefined ? 0 : req.query.year,
+  };
+  next();
+});
 
-//get user profile details
+// User endpoints
 app.get('/:username', leetcode.userData);
 app.get('/:username/badges', leetcode.userBadges);
 app.get('/:username/solved', leetcode.solvedProblem);
@@ -170,36 +148,19 @@ app.get('/:username/contest/history', leetcode.userContestHistory);
 app.get('/:username/submission', leetcode.submission);
 app.get('/:username/acSubmission', leetcode.acSubmission);
 app.get('/:username/calendar', leetcode.calendar);
-app.get('/:username/skill/', leetcode.skillStats);
-app.get('/:username/profile/', leetcode.userProfile);
+app.get('/:username/skill', leetcode.skillStats);
+app.get('/:username/profile', leetcode.userProfile);
 app.get('/:username/language', leetcode.languageStats);
-app.get('/:username/progress/', leetcode.progress);
+app.get('/:username/progress', leetcode.progress);
 
-
-
-/* ----- Migrated to new routes -> these will be deleted -----*/
-//get user profile calendar
+/* ----- Deprecated (to be removed) -----*/
 app.get('/userProfileCalendar', leetcode.userProfileCalendar_);
-
-//get user profile details
 app.get('/userProfile/:id', leetcode.userProfile_);
-
-//get daily question
 app.get('/dailyQuestion', leetcode.dailyQuestion_);
-
-// get the selection question raw
 app.get('/selectQuestion', leetcode.selectProblemRaw);
-
-//get skill stats
 app.get('/skillStats/:username', leetcode.skillStats_);
-
-//get user profile question progress
 app.get('/userProfileUserQuestionProgressV2/:userSlug', leetcode.userProfileUserQuestionProgressV2_);
-
 app.get('/languageStats', leetcode.languageStats_);
-
-//get user contest ranking info
 app.get('/userContestRankingInfo/:username', leetcode.userContestRankingInfo_);
-
 
 export default app;
