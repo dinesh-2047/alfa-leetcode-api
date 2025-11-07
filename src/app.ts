@@ -16,8 +16,37 @@ const limiter = rateLimit({
   message: 'Too many request from this IP, try again in 1 hour',
 });
 
+// Configure CORS to explicitly allow localhost (and other trusted origins).
+// This allows browser apps served from localhost (any port) to make requests to this API.
+// It also permits non-browser clients (curl, Postman) by allowing requests with no origin.
+const corsOptions: cors.CorsOptions = {
+  origin: (origin, callback) => {
+    // If no origin (curl, server-to-server), allow it
+    if (!origin) return callback(null, true);
+
+    // Allow explicit production origins (add your production domain(s) here)
+    const allowedOrigins = [
+      'https://alfaarghya.github.io',
+      'http://localhost:5173',
+      'https://localhost5173',// <- replace with your real domain
+    ];
+
+    // Allow any localhost origin (any port) and 127.0.0.1
+    const isLocalhost = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+
+    if (isLocalhost || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
+  optionsSuccessStatus: 200,
+};
+
 app.use(cache('5 minutes'));
-app.use(cors()); //enable all CORS request
+app.use(cors(corsOptions)); // enable CORS with options (localhost allowed)
 app.use(limiter); //limit to all API
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   console.log('Requested URL:', req.originalUrl);
@@ -27,7 +56,7 @@ app.use((req: express.Request, _res: Response, next: NextFunction) => {
 app.get('/', (_req, res) => {
   res.json({
     apiOverview:
-      'Welcome to the Alfa-Leetcode-API! Alfa-Leetcode-Api is a custom solution born out of the need for a well-documented and detailed LeetCode API. This project is designed to provide developers with endpoints that offer insights into a user"s profile, badges, solved questions, contest details, contest history, submissions, and also daily questions, selected problem, list of problems.',
+      'Welcome to the Alfa-Leetcode-API! Alfa-Leetcode-Api is a custom solution born out of the need for a well-documented and detailed LeetCode API. This project is designed to provide developers wit[...]
     apiEndpointsLink:
       'https://github.com/alfaarghya/alfa-leetcode-api?tab=readme-ov-file#endpoints-',
     routes: {
