@@ -16,37 +16,40 @@ const limiter = rateLimit({
   message: 'Too many request from this IP, try again in 1 hour',
 });
 
-// Configure CORS to explicitly allow localhost (and other trusted origins).
-// This allows browser apps served from localhost (any port) to make requests to this API.
-// It also permits non-browser clients (curl, Postman) by allowing requests with no origin.
-const corsOptions: cors.CorsOptions = {
-  origin: (origin, callback) => {
-    // If no origin (curl, server-to-server), allow it
-    if (!origin) return callback(null, true);
+// Very permissive CORS: allow every origin and echo/request all headers.
+// WARNING: This is insecure for production. Use only for local/dev or when
+// you explicitly want to allow everything.
+app.use((req: express.Request, res: Response, next: NextFunction) => {
+  // Allow any origin
+  res.header('Access-Control-Allow-Origin', '*');
 
-    // Allow explicit production origins (add your production domain(s) here)
-    const allowedOrigins = [
-      'https://alfaarghya.github.io',
-      'http://localhost:5173',
-      'https://localhost5173',// <- replace with your real domain
-    ];
+  // Allow common methods and OPTIONS (preflight)
+  res.header('Access-Control-Allow-Methods', 'GET,HEAD,PUT,PATCH,POST,DELETE,OPTIONS');
 
-    // Allow any localhost origin (any port) and 127.0.0.1
-    const isLocalhost = /^(https?:\/\/)?(localhost|127\.0\.0\.1)(:\d+)?$/i.test(origin);
+  // If the browser sent Access-Control-Request-Headers (preflight), echo them back.
+  // Otherwise allow any header by using '*'. Some servers/clients expect an explicit list,
+  // so echoing what's requested is the most permissive reliable approach.
+  const requestedHeaders = req.header('access-control-request-headers');
+  res.header('Access-Control-Allow-Headers', requestedHeaders || '*');
 
-    if (isLocalhost || allowedOrigins.includes(origin)) {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE'],
-  optionsSuccessStatus: 200,
-};
+  // Allow credentials is incompatible with Access-Control-Allow-Origin: '*' in browsers.
+  // We're not enabling credentials here to remain fully permissive. If you need credentials,
+  // change the logic to reflect a single origin instead of '*'.
+  res.header('Access-Control-Allow-Credentials', 'false');
+
+  // Short-circuit preflight requests
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
+
+  next();
+});
+
+// Keep cors middleware as a fallback for non-OPTIONS requests (no-op in our setup,
+// but harmless to keep for future use)
+app.use(cors());
 
 app.use(cache('5 minutes'));
-app.use(cors(corsOptions)); // enable CORS with options (localhost allowed)
 app.use(limiter); //limit to all API
 app.use((req: express.Request, _res: Response, next: NextFunction) => {
   console.log('Requested URL:', req.originalUrl);
